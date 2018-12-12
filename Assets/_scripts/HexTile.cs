@@ -1,13 +1,18 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class HexTile : MonoBehaviour {
     private LevelGen levelGen;
+    private GameController gameController;
+    private Selector selector;
 
     private void Awake()
     {
         levelGen = GetComponentInParent<LevelGen>();
+        gameController = GetComponentInParent<GameController>();
+        selector = GetComponentInParent<Selector>();
     }
 	
 	// Update is called once per frame
@@ -18,15 +23,20 @@ public class HexTile : MonoBehaviour {
 
     private void OnMouseDown()
     {
-        transform.Translate(new Vector3(0f, 0.2f, 0f));
-        Neighbors.ForEach(x => x.transform.Translate(new Vector3(0f, 0.1f, 0f)));
+        selector.TogglePathSelectMode();
+        selector.SelectTarget(this);
+    }
+
+
+    private void OnMouseEnter()
+    {
+        //if (selector.PathSelectMode) selector.SelectTarget(this);
     }
 
 
     private void OnMouseUp()
     {
-        transform.Translate(new Vector3(0f, -0.2f, 0f));
-        Neighbors.ForEach(x => x.transform.Translate(new Vector3(0f, -0.1f, 0f)));
+        
     }
 
 
@@ -34,7 +44,13 @@ public class HexTile : MonoBehaviour {
     public void ToggleSelect()
     {
         selected = !selected;
+
+        if (selected) transform.Translate(new Vector3(0f, 0.2f, 0f));
+
+        if (!selected) transform.Translate(new Vector3(0f, -0.2f, 0f));
     }
+
+
     /************************************************************************************************
      *                  Static Methods                                                              */
 
@@ -72,6 +88,33 @@ public class HexTile : MonoBehaviour {
         return null;
     }
 
+    public static List<HexTile> GetPath(HexTile start, HexTile end)
+    {
+        Dictionary<HexTile, int> fromStart = start.RangeFrom;
+        Dictionary<HexTile, int> fromEnd = end.RangeFrom;
+
+        int maxLength = fromStart[end];
+        List<HexTile> path = new List<HexTile>();
+
+        for (int stepCount = 0; stepCount <= maxLength; stepCount++)
+        {
+            HexTile step = null;
+
+            foreach (HexTile tile in fromStart.Keys)
+            {
+                if (fromStart[tile] >= stepCount) continue;
+                if (fromEnd[tile] >= maxLength - stepCount) continue;
+                if (fromStart[tile] + fromEnd[tile] > maxLength) continue;
+
+                step = tile;
+            }
+
+            path.Add(step);
+        }
+
+        return path;
+    }
+
 
     /************************************************************************************************
      *                      Dynamic Methods                                                         */
@@ -99,10 +142,54 @@ public class HexTile : MonoBehaviour {
     {
         get { List<HexTile> neighborList = new List<HexTile>();
             foreach (Vector3 position in NeighborPositions)
-                if (position != null)
-                    neighborList.Add(GetHex(position, levelGen.transform));
+            {
+                if (position == null) continue;
+                HexTile neighbor = GetHex(position, levelGen.transform);
+
+                if (neighbor == null) continue;
+                neighborList.Add(neighbor);
+            }
             return neighborList;
         }
+    }
+
+
+    private Dictionary<HexTile, int> tileRanges;
+    public Dictionary<HexTile, int> RangeFrom
+    {
+        get
+        {
+            if (tileRanges.Count != levelGen.Tiles.Count)
+                SetRanges();
+
+            return tileRanges;
+        }
+    }
+
+    private void SetRanges()
+    {
+        List<HexTile> allTiles = levelGen.Tiles;
+        Dictionary<HexTile, int> ranges = new Dictionary<HexTile, int>();
+
+        int distance = 0;
+        ranges.Add(this, distance);
+
+        while (ranges.Count <= allTiles.Count)
+        {
+            distance++;
+
+            List<HexTile> searchedTiles = ranges.Keys.ToList<HexTile>();
+            foreach (HexTile tile in searchedTiles)
+            {
+                foreach (HexTile neighbor in tile.Neighbors)
+                {
+                    if (ranges.ContainsKey(neighbor)) continue;
+                    ranges.Add(neighbor, distance);
+                }
+            }
+        }
+
+        tileRanges = ranges;
     }
 
 
@@ -113,7 +200,7 @@ public class HexTile : MonoBehaviour {
     {
         foreach (Vector3 neighbor in NeighborPositions)
         {
-            if (! levelGen.bounds.Contains(neighbor)) continue;
+            if (! levelGen.Bounds.Contains(neighbor)) continue;
             if (GetHex(neighbor, levelGen.transform) != null) continue;
 
             HexTile newHex = levelGen.AddTile(neighbor);

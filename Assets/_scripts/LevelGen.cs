@@ -5,36 +5,42 @@ using UnityEngine;
 
 public class LevelGen : MonoBehaviour {
     public GameObject tileObject;
-    public Bounds bounds;
 
-    private List<HexTile> hexTiles;
+    private Bounds bounds;
+    public Bounds Bounds { get { return bounds; } }
 
-	// Use this for initialization
-	void Start () {
-        hexTiles = new List<HexTile>();
+    private List<HexTile> tiles;
+    public List<HexTile> Tiles
+    {
+        get { return tiles; }
+    }
+
+    // Use this for initialization
+    void Awake()
+    {
         bounds = GetComponent<Collider>().bounds;
+        tiles = new List<HexTile>();
+    }
 
+
+    public void CreateLevel()
+    { 
         HexTile firstTile = AddTile(Vector3.zero);
         firstTile.GenerateNeighbors();
 	}
-	
-	// Update is called once per frame
-	void Update () {
 
-	}
-
-    private void OnMouseDown()
-    {
-        
-    }
 
     public HexTile AddTile(Vector3 location)
     {
-        GameObject newTile = Instantiate(tileObject, transform);
+        GameObject newTileObject = Instantiate(tileObject, transform);
 
-        newTile.transform.position = location;
+        newTileObject.transform.position = location;
 
-        return newTile.GetComponent<HexTile>();
+        HexTile newTile = newTileObject.GetComponent<HexTile>();
+
+        tiles.Add(newTile);
+
+        return newTile;
     }
 }
 
